@@ -1,6 +1,7 @@
 export class CityMap {
     private size: number;
     private map: string[][];
+    private seed: number;
 
     private centerStartX: number;
     private centerEndX: number;
@@ -11,10 +12,11 @@ export class CityMap {
     private centerRingStartY: number;
     private centerRingEndY: number;
 
-    private random: () => number;
+    private random: (seed: number) => number;
 
     constructor(size: number, centerWidth: number, centerHeight: number, seed: number) {
         this.size = size;
+        this.seed = seed;
         this.random = this.createRandomGenerator(seed);
 
         this.map = [];
@@ -33,7 +35,7 @@ export class CityMap {
     /**
      * X = route
      * O = maison
-     * A = centre
+     * P = centre
      * @param seed Random seed for generating the city map
      */
     public generateCityMap(): string[][] {
@@ -47,18 +49,19 @@ export class CityMap {
         const districtOrder = ["nw", "ne", "sw", "se"];
 
         for (let i = 0; i < districtOrder.length; i++) {
-            if (this.random() < 0.85 || i < 2) {
+            if (this.random(this.seed) < 0.85 || i < 2) {
                 this.buildCornerDistrict(districtOrder[i]);
             }
         }
 
         for (let i = 0; i < 2; i++) {
-            if (this.random() < 0.9) {
+            if (this.random(this.seed) < 0.9) {
                 this.carveUsefulCorridors();
             }
         }
 
         this.breakHouseBlocks();
+        this.randomizeHouses();
 
         return this.map;
     }
@@ -72,7 +75,7 @@ export class CityMap {
     }
 
     private randomInt(min: number, max: number) {
-        return Math.floor(this.random() * (max - min + 1)) + min;
+        return Math.floor(this.random(this.seed) * (max - min + 1)) + min;
     }
 
     private inside(x: number, y: number) {
@@ -98,7 +101,7 @@ export class CityMap {
 
     private place(x: number, y: number, value: string) {
         if (!this.inside(x, y)) return false;
-        if (this.map[y][x] === "A") return false;
+        if (this.map[y][x] === "P") return false;
 
         this.map[y][x] = value;
         return true;
@@ -140,7 +143,7 @@ export class CityMap {
 
     private road(x: number, y: number) {
         if (!this.inside(x, y)) return false;
-        if (this.map[y][x] === "A") return false;
+        if (this.map[y][x] === "P") return false;
         if (this.wouldCreateFull2x2(x, y)) return false;
 
         this.map[y][x] = "X";
@@ -191,7 +194,7 @@ export class CityMap {
     private buildCenter() {
         for (let y = this.centerStartY; y <= this.centerEndY; y++) {
             for (let x = this.centerStartX; x <= this.centerEndX; x++) {
-                this.place(x, y, "A");
+                this.place(x, y, "P");
             }
         }
 
@@ -457,6 +460,36 @@ export class CityMap {
 
             if (!changed) {
                 break;
+            }
+        }
+    }
+
+    private randomizeHouses() {
+        const houseModels = [
+            { model: "A", probability: 0.125 },
+            { model: "B", probability: 0.125 },
+            { model: "C", probability: 0.125 },
+            { model: "D", probability: 0.125 },
+            { model: "E", probability: 0.125 },
+            { model: "F", probability: 0.125 },
+            { model: "G", probability: 0.125 },
+            { model: "H", probability: 0.125 },
+        ];
+
+        for (let y = 0; y < this.size; y++) {
+            for (let x = 0; x < this.size; x++) {
+                if (this.isHouse(x, y)) {
+                    const randomValue = this.random(this.seed + x * 374761393 + y * 668265263);
+
+                    let cumulativeProbability = 0;
+                    for (let i = 0; i < houseModels.length; i++) {
+                        cumulativeProbability += houseModels[i].probability;
+                        if (randomValue < cumulativeProbability) {
+                            this.map[y][x] = houseModels[i].model;
+                            break;
+                        }
+                    }
+                }
             }
         }
     }

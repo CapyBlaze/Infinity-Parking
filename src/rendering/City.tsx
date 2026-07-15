@@ -2,6 +2,8 @@ import { memo, useMemo } from "react";
 import type { ReactElement } from "react";
 
 import { useGLTF } from "@react-three/drei";
+import * as THREE from "three";
+import { Group, type Object3DEventMap } from "three";
 
 import { CityMap } from "../utils/cityMap";
 
@@ -12,9 +14,38 @@ interface CityProps {
     height?: number;
 }
 
-const isRoad = (map: string[][], x: number, z: number): boolean => {
+interface ModelProps {
+    model: Group<Object3DEventMap>;
+    x: number;
+    z: number;
+    rotationY: number;
+}
+
+function isRoad(map: string[][], x: number, z: number): boolean {
     return map[x] !== undefined && map[x][z] === "X";
-};
+}
+
+const Model = memo(function Model({ model, x, z, rotationY }: ModelProps) {
+    model.traverse((child) => {
+        if (
+            (child as THREE.Mesh).isMesh &&
+            (child as THREE.Mesh).material !== undefined &&
+            "roughness" in (child as THREE.Mesh).material
+        ) {
+            child.material.roughness = 1;
+            child.material.metalness = 0;
+        }
+    });
+
+    return (
+        <primitive
+            key={`map-${x}-${z}`}
+            object={model.clone()}
+            position={[x * TILE_SIZE, 0, z * TILE_SIZE]}
+            rotation={[0, rotationY, 0]}
+        />
+    );
+});
 
 export const City = memo(function City({ width = 3, height = 3 }: CityProps) {
     const { scene: modelBase } = useGLTF("/models/base.gltf");
@@ -22,6 +53,13 @@ export const City = memo(function City({ width = 3, height = 3 }: CityProps) {
     const { scene: modelRoadCorner } = useGLTF("/models/road_corner.gltf");
     const { scene: modelRoadJunction } = useGLTF("/models/road_junction.gltf");
     const { scene: modelRoadTSplit } = useGLTF("/models/road_tsplit.gltf");
+    const { scene: modelBuildingA } = useGLTF("/models/building_A.gltf");
+    const { scene: modelBuildingB } = useGLTF("/models/building_B.gltf");
+    const { scene: modelBuildingC } = useGLTF("/models/building_C.gltf");
+    const { scene: modelBuildingD } = useGLTF("/models/building_D.gltf");
+    const { scene: modelBuildingE } = useGLTF("/models/building_E.gltf");
+    const { scene: modelBuildingF } = useGLTF("/models/building_F.gltf");
+    const { scene: modelBuildingG } = useGLTF("/models/building_G.gltf");
     const { scene: modelBuildingH } = useGLTF("/models/building_H.gltf");
 
     const terrain = useMemo(() => {
@@ -52,6 +90,17 @@ export const City = memo(function City({ width = 3, height = 3 }: CityProps) {
             15: { model: modelRoadJunction, rotation: 0 },
         };
 
+        const BUILDING_MODELS: Record<string, Group<Object3DEventMap>> = {
+            A: modelBuildingA,
+            B: modelBuildingB,
+            C: modelBuildingC,
+            D: modelBuildingD,
+            E: modelBuildingE,
+            F: modelBuildingF,
+            G: modelBuildingG,
+            H: modelBuildingH,
+        };
+
         const cityMap = new CityMap(13, width, height, 4557555);
         const map = cityMap.generateCityMap();
         const list: ReactElement[] = [];
@@ -73,36 +122,27 @@ export const City = memo(function City({ width = 3, height = 3 }: CityProps) {
                         };
 
                         list.push(
-                            <primitive
-                                key={`${x},${z}`}
-                                object={config.model.clone()}
-                                position={[x * TILE_SIZE, 0, z * TILE_SIZE]}
-                                rotation={[0, config.rotation, 0]}
-                            />
+                            <Model model={config.model} x={x} z={z} rotationY={config.rotation} />
                         );
                         break;
                     }
 
-                    case "O":
-                        list.push(
-                            <primitive
-                                key={`${x},${z}`}
-                                object={modelBuildingH.clone()}
-                                position={[x * TILE_SIZE, 0, z * TILE_SIZE]}
-                                rotation={[0, 0, 0]}
-                            />
-                        );
+                    case "A":
+                    case "B":
+                    case "C":
+                    case "D":
+                    case "E":
+                    case "F":
+                    case "G":
+                    case "H": {
+                        const model = BUILDING_MODELS[map[x][z]];
+
+                        list.push(<Model model={model.clone()} x={x} z={z} rotationY={0} />);
                         break;
+                    }
 
                     default:
-                        list.push(
-                            <primitive
-                                key={`${x},${z}`}
-                                object={modelBase.clone()}
-                                position={[x * TILE_SIZE, 0, z * TILE_SIZE]}
-                                rotation={[0, 0, 0]}
-                            />
-                        );
+                        list.push(<Model model={modelBase.clone()} x={x} z={z} rotationY={0} />);
                         break;
                 }
             }
@@ -117,6 +157,13 @@ export const City = memo(function City({ width = 3, height = 3 }: CityProps) {
         modelRoadCorner,
         modelRoadJunction,
         modelRoadTSplit,
+        modelBuildingA,
+        modelBuildingB,
+        modelBuildingC,
+        modelBuildingD,
+        modelBuildingE,
+        modelBuildingF,
+        modelBuildingG,
         modelBuildingH,
     ]);
 
