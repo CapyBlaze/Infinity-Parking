@@ -12,12 +12,18 @@ export class CityMap {
     private centerRingStartY: number;
     private centerRingEndY: number;
 
-    private random: (seed: number) => number;
+    private random: () => number;
+    private houseRegions: Array<{ left: number; top: number; right: number; bottom: number }>;
+
+    private static readonly HOUSE_MODELS = ["A", "B", "C", "D", "E", "F", "G", "H"];
+
+    private static readonly MIN_REGION_SIZE = 5;
 
     constructor(size: number, centerWidth: number, centerHeight: number, seed: number) {
         this.size = size;
         this.seed = seed;
         this.random = this.createRandomGenerator(seed);
+        this.houseRegions = [];
 
         this.map = [];
 
@@ -46,21 +52,8 @@ export class CityMap {
         this.clearMap();
         this.buildCenter();
 
-        const districtOrder = ["nw", "ne", "sw", "se"];
-
-        for (let i = 0; i < districtOrder.length; i++) {
-            if (this.random(this.seed) < 0.85 || i < 2) {
-                this.buildCornerDistrict(districtOrder[i]);
-            }
-        }
-
-        for (let i = 0; i < 2; i++) {
-            if (this.random(this.seed) < 0.9) {
-                this.carveUsefulCorridors();
-            }
-        }
-
-        this.breakHouseBlocks();
+        this.houseRegions = [];
+        this.buildRoadSkeleton();
         this.randomizeHouses();
 
         return this.map;
@@ -75,7 +68,7 @@ export class CityMap {
     }
 
     private randomInt(min: number, max: number) {
-        return Math.floor(this.random(this.seed) * (max - min + 1)) + min;
+        return Math.floor(this.random() * (max - min + 1)) + min;
     }
 
     private inside(x: number, y: number) {
@@ -171,6 +164,96 @@ export class CityMap {
             this.road(x, top);
             this.road(x, bottom);
         }
+    }
+
+    private buildRoadSkeleton() {
+        this.drawRectangleRoad(0, 0, this.size - 1, this.size - 1);
+
+        this.drawLine(this.centerRingStartX, 0, this.centerRingStartX, this.size - 1);
+        this.drawLine(0, this.centerRingStartY, this.size - 1, this.centerRingStartY);
+
+        const regions = [
+            { left: 0, top: 0, right: this.centerRingStartX, bottom: this.centerRingStartY },
+            {
+                left: this.centerRingEndX,
+                top: 0,
+                right: this.size - 1,
+                bottom: this.centerRingStartY,
+            },
+            {
+                left: 0,
+                top: this.centerRingEndY,
+                right: this.centerRingStartX,
+                bottom: this.size - 1,
+            },
+            {
+                left: this.centerRingEndX,
+                top: this.centerRingEndY,
+                right: this.size - 1,
+                bottom: this.size - 1,
+            },
+        ];
+
+        for (let i = 0; i < regions.length; i++) {
+            this.subdivideRegion(regions[i], 0);
+        }
+    }
+
+    private subdivideRegion(
+        region: { left: number; top: number; right: number; bottom: number },
+        depth: number
+    ) {
+        const width = region.right - region.left + 1;
+        const height = region.bottom - region.top + 1;
+
+        if (depth >= 3) {
+            this.houseRegions.push(region);
+            return;
+        }
+        if (width < CityMap.MIN_REGION_SIZE || height < CityMap.MIN_REGION_SIZE) {
+            this.houseRegions.push(region);
+            return;
+        }
+
+        const splitChance = depth === 0 ? 0.85 : depth === 1 ? 0.7 : 0.5;
+        if (this.random() > splitChance) {
+            this.houseRegions.push(region);
+            return;
+        }
+
+        const splitVertically = width >= height ? this.random() < 0.6 : this.random() < 0.4;
+
+        if (splitVertically && width >= CityMap.MIN_REGION_SIZE) {
+            const splitX = this.randomInt(region.left + 1, region.right - 1);
+            this.drawLine(splitX, region.top, splitX, region.bottom);
+
+            this.subdivideRegion(
+                { left: region.left, top: region.top, right: splitX, bottom: region.bottom },
+                depth + 1
+            );
+            this.subdivideRegion(
+                { left: splitX, top: region.top, right: region.right, bottom: region.bottom },
+                depth + 1
+            );
+            return;
+        }
+
+        if (height >= CityMap.MIN_REGION_SIZE) {
+            const splitY = this.randomInt(region.top + 1, region.bottom - 1);
+            this.drawLine(region.left, splitY, region.right, splitY);
+
+            this.subdivideRegion(
+                { left: region.left, top: region.top, right: region.right, bottom: splitY },
+                depth + 1
+            );
+            this.subdivideRegion(
+                { left: region.left, top: splitY, right: region.right, bottom: region.bottom },
+                depth + 1
+            );
+            return;
+        }
+
+        this.houseRegions.push(region);
     }
 
     private drawLine(x1: number, y1: number, x2: number, y2: number) {
@@ -465,33 +548,126 @@ export class CityMap {
     }
 
     private randomizeHouses() {
-        const houseModels = [
-            { model: "A", probability: 0.125 },
-            { model: "B", probability: 0.125 },
-            { model: "C", probability: 0.125 },
-            { model: "D", probability: 0.125 },
-            { model: "E", probability: 0.125 },
-            { model: "F", probability: 0.125 },
-            { model: "G", probability: 0.125 },
-            { model: "H", probability: 0.125 },
-        ];
+        for (let i = 0; i < this.houseRegions.length; i++) {
+            const region = this.houseRegions[i];
+            this.carveHouseRegionStreets(region);
 
-        for (let y = 0; y < this.size; y++) {
-            for (let x = 0; x < this.size; x++) {
-                if (this.isHouse(x, y)) {
-                    const randomValue = this.random(this.seed + x * 374761393 + y * 668265263);
+            const patternId = Math.floor(
+                this.hashNoise(this.seed, region.left + i * 31, region.top + i * 17) * 6
+            );
 
-                    let cumulativeProbability = 0;
-                    for (let i = 0; i < houseModels.length; i++) {
-                        cumulativeProbability += houseModels[i].probability;
-                        if (randomValue < cumulativeProbability) {
-                            this.map[y][x] = houseModels[i].model;
-                            break;
-                        }
-                    }
+            const baseModel = this.pickHouseModel(region.left, region.top, 0);
+            const secondaryModel = this.pickHouseModel(region.right, region.bottom, 1);
+            const tertiaryModel = this.pickHouseModel(
+                region.left + region.right,
+                region.top + region.bottom,
+                2
+            );
+
+            for (let y = region.top; y <= region.bottom; y++) {
+                for (let x = region.left; x <= region.right; x++) {
+                    if (!this.isHouse(x, y)) continue;
+
+                    const value = this.pickPatternValue(
+                        patternId,
+                        region,
+                        x,
+                        y,
+                        baseModel,
+                        secondaryModel,
+                        tertiaryModel
+                    );
+
+                    this.map[y][x] = value;
                 }
             }
         }
+    }
+
+    private carveHouseRegionStreets(region: {
+        left: number;
+        top: number;
+        right: number;
+        bottom: number;
+    }) {
+        const xOffset = 1 + Math.floor(this.hashNoise(this.seed, region.left, region.top) * 2);
+        const yOffset = 1 + Math.floor(this.hashNoise(this.seed, region.right, region.bottom) * 2);
+
+        for (let x = region.left + xOffset; x < region.right; x += 3) {
+            this.drawLine(x, region.top, x, region.bottom);
+        }
+
+        for (let y = region.top + yOffset; y < region.bottom; y += 3) {
+            this.drawLine(region.left, y, region.right, y);
+        }
+    }
+
+    private pickPatternValue(
+        patternId: number,
+        region: { left: number; top: number; right: number; bottom: number },
+        x: number,
+        y: number,
+        baseModel: string,
+        secondaryModel: string,
+        tertiaryModel: string
+    ) {
+        const width = region.right - region.left + 1;
+        const height = region.bottom - region.top + 1;
+        const localX = x - region.left;
+        const localY = y - region.top;
+
+        if (width <= 2 || height <= 2) {
+            return baseModel;
+        }
+
+        if (patternId === 0) {
+            return baseModel;
+        }
+
+        if (patternId === 1) {
+            return localX < Math.ceil(width / 2) ? baseModel : secondaryModel;
+        }
+
+        if (patternId === 2) {
+            return localY < Math.ceil(height / 2) ? baseModel : secondaryModel;
+        }
+
+        if (patternId === 3) {
+            return (localX + localY) % 2 === 0 ? baseModel : secondaryModel;
+        }
+
+        if (patternId === 4) {
+            const onBorder =
+                localX === 0 || localY === 0 || localX === width - 1 || localY === height - 1;
+            return onBorder ? baseModel : tertiaryModel;
+        }
+
+        const quadrantX = localX < Math.ceil(width / 2) ? 0 : 1;
+        const quadrantY = localY < Math.ceil(height / 2) ? 0 : 1;
+
+        if (quadrantX === 0 && quadrantY === 0) return baseModel;
+        if (quadrantX === 1 && quadrantY === 0) return secondaryModel;
+        if (quadrantX === 0 && quadrantY === 1) return tertiaryModel;
+
+        return CityMap.HOUSE_MODELS[
+            (CityMap.HOUSE_MODELS.indexOf(baseModel) + 3) % CityMap.HOUSE_MODELS.length
+        ];
+    }
+
+    private pickHouseModel(x: number, y: number, offset: number) {
+        const randomValue = this.hashNoise(this.seed + offset * 1013, x, y);
+        const modelIndex = Math.floor(randomValue * CityMap.HOUSE_MODELS.length);
+
+        return CityMap.HOUSE_MODELS[modelIndex];
+    }
+
+    private hashNoise(seed: number, x: number, y: number) {
+        let value = seed ^ Math.imul(x + 1, 374761393) ^ Math.imul(y + 1, 668265263);
+        value = (value ^ (value >>> 13)) >>> 0;
+        value = Math.imul(value, 1274126177);
+        value ^= value >>> 16;
+
+        return (value >>> 0) / 4294967296;
     }
 
     private createRandomGenerator(seed: number): () => number {
