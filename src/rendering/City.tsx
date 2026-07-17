@@ -32,14 +32,16 @@ const Model = memo(function Model({ model, x, z, rotationY }: ModelProps) {
             (child as THREE.Mesh).material !== undefined &&
             "roughness" in (child as THREE.Mesh).material
         ) {
-            child.material.roughness = 1;
-            child.material.metalness = 0;
+            const mesh = child as THREE.Mesh;
+            const material = mesh.material as THREE.MeshStandardMaterial;
+
+            material.roughness = 1;
+            material.metalness = 0;
         }
     });
 
     return (
         <primitive
-            key={`map-${x}-${z}`}
             object={model.clone()}
             position={[x * TILE_SIZE, 0, z * TILE_SIZE]}
             rotation={[0, rotationY, 0]}
@@ -101,9 +103,12 @@ export const City = memo(function City({ width = 3, height = 3 }: CityProps) {
             H: modelBuildingH,
         };
 
-        const cityMap = new CityMap(13, width, height, 4557555);
+        const cityMap = new CityMap(4, width, height, 4557555);
         const map = cityMap.generateCityMap();
         const list: ReactElement[] = [];
+
+        const offsetX = -(map.length - 1) / 2;
+        const offsetZ = -(map[0].length - 1) / 2;
 
         for (let x = 0; x < map.length; x++) {
             for (let z = 0; z < map[x].length; z++) {
@@ -122,7 +127,13 @@ export const City = memo(function City({ width = 3, height = 3 }: CityProps) {
                         };
 
                         list.push(
-                            <Model model={config.model} x={x} z={z} rotationY={config.rotation} />
+                            <Model
+                                key={`map-${x}-${z}`}
+                                model={config.model}
+                                x={x + offsetX}
+                                z={z + offsetZ}
+                                rotationY={config.rotation}
+                            />
                         );
                         break;
                     }
@@ -137,12 +148,28 @@ export const City = memo(function City({ width = 3, height = 3 }: CityProps) {
                     case "H": {
                         const model = BUILDING_MODELS[map[x][z]];
 
-                        list.push(<Model model={model.clone()} x={x} z={z} rotationY={0} />);
+                        list.push(
+                            <Model
+                                key={`map-${x}-${z}`}
+                                model={model.clone()}
+                                x={x + offsetX}
+                                z={z + offsetZ}
+                                rotationY={0}
+                            />
+                        );
                         break;
                     }
 
                     default:
-                        list.push(<Model model={modelBase.clone()} x={x} z={z} rotationY={0} />);
+                        list.push(
+                            <Model
+                                key={`map-${x}-${z}`}
+                                model={modelBase.clone()}
+                                x={x + offsetX}
+                                z={z + offsetZ}
+                                rotationY={0}
+                            />
+                        );
                         break;
                 }
             }
@@ -167,7 +194,15 @@ export const City = memo(function City({ width = 3, height = 3 }: CityProps) {
         modelBuildingH,
     ]);
 
-    return <group>{terrain}</group>;
+    return (
+        <group>
+            {terrain}
+            <mesh position={[0, 0, 0]}>
+                <cylinderGeometry args={[0.03, 0.03, 5, 32]} />
+                <meshStandardMaterial color="red" />
+            </mesh>
+        </group>
+    );
 });
 
 useGLTF.preload("/models/base.gltf");
