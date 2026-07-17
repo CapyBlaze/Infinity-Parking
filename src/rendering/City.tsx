@@ -22,7 +22,7 @@ interface ModelProps {
 }
 
 function isRoad(map: string[][], x: number, z: number): boolean {
-    return map[x] !== undefined && map[x][z] === "X";
+    return map[x] !== undefined && map[x][z] === "R";
 }
 
 const Model = memo(function Model({ model, x, z, rotationY }: ModelProps) {
@@ -103,7 +103,7 @@ export const City = memo(function City({ width = 3, height = 3 }: CityProps) {
             H: modelBuildingH,
         };
 
-        const cityMap = new CityMap(4, width, height, 4557555);
+        const cityMap = new CityMap(4, width, height, 153214);
         const map = cityMap.generateCityMap();
         const list: ReactElement[] = [];
 
@@ -113,7 +113,7 @@ export const City = memo(function City({ width = 3, height = 3 }: CityProps) {
         for (let x = 0; x < map.length; x++) {
             for (let z = 0; z < map[x].length; z++) {
                 switch (map[x][z]) {
-                    case "X": {
+                    case "R": {
                         const N = isRoad(map, x, z - 1) ? 8 : 0;
                         const E = isRoad(map, x + 1, z) ? 4 : 0;
                         const S = isRoad(map, x, z + 1) ? 2 : 0;
