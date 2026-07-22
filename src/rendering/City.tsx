@@ -379,15 +379,7 @@ export const City = memo(function City({ width = 3, height = 3 }: CityProps) {
         modelBuildingH,
     ]);
 
-    return (
-        <group>
-            {terrain}
-            <mesh position={[0, 0, 0]}>
-                <cylinderGeometry args={[0.03, 0.03, 5, 32]} />
-                <meshStandardMaterial color="red" />
-            </mesh>
-        </group>
-    );
+    return <group>{terrain}</group>;
 });
 
 useGLTF.preload("/models/base.gltf");

@@ -11,8 +11,7 @@ export default function Scene() {
     return (
         <Canvas shadows>
             <Camera width={10} height={10} />
-
-            <Light />
+            <Light isNight={false} />
 
             <City width={PARKING_SIZE_WIDTH} height={PARKING_SIZE_HEIGHT} />
         </Canvas>

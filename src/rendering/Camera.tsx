@@ -27,9 +27,9 @@ export function Camera({ width, height, tileSize = 2 }: CameraProps) {
 
             <OrbitControls
                 target={[0, 0, 0]}
-                enablePan={true}
                 enableZoom={true}
                 enableRotate={true}
+                enablePan={false}
             />
         </>
     );
