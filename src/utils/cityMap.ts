@@ -43,7 +43,9 @@ export class CityMap {
         this.map = Array.from({ length: this.sizeHeight }, () => Array(this.sizeWidth).fill("O"));
 
         this.buildCenter();
-        this.buildFrameDistricts();
+        this.buildDynamicDistricts();
+
+        this.cleanThickRoads();
         this.randomizeHouses();
 
         return this.map;
@@ -70,56 +72,138 @@ export class CityMap {
             }
         }
 
-        for (let x = 0; x < this.sizeWidth; x++) {
+        for (let x = this.centerRingStartX; x <= this.centerRingEndX; x++) {
             this.place(x, this.centerRingStartY, "R");
             this.place(x, this.centerRingEndY, "R");
         }
 
-        for (let y = 0; y < this.sizeHeight; y++) {
+        for (let y = this.centerRingStartY; y <= this.centerRingEndY; y++) {
             this.place(this.centerRingStartX, y, "R");
             this.place(this.centerRingEndX, y, "R");
         }
     }
 
-    private buildFrameDistricts() {
-        const xSlices: Array<[number, number]> = [
-            [0, this.centerRingStartX - 1],
-            [this.centerRingStartX + 1, this.centerRingEndX - 1],
-            [this.centerRingEndX + 1, this.sizeWidth - 1],
-        ];
+    private buildDynamicDistricts() {
+        const dirTL = this.random() < 0.5 ? "UP" : "LEFT";
+        const dirTR = this.random() < 0.5 ? "UP" : "RIGHT";
+        const dirBL = this.random() < 0.5 ? "DOWN" : "LEFT";
+        const dirBR = this.random() < 0.5 ? "DOWN" : "RIGHT";
 
-        const ySlices: Array<[number, number]> = [
-            [0, this.centerRingStartY - 1],
-            [this.centerRingStartY + 1, this.centerRingEndY - 1],
-            [this.centerRingEndY + 1, this.sizeHeight - 1],
-        ];
-
-        for (let row = 0; row < 3; row++) {
-            for (let col = 0; col < 3; col++) {
-                if (row === 1 && col === 1) continue;
-
-                const [left, right] = xSlices[col];
-                const [top, bottom] = ySlices[row];
-
-                if (right < left || bottom < top) continue;
-
-                this.subdivide(left, top, right, bottom);
+        if (dirTL === "UP") {
+            for (let y = 0; y < this.centerRingStartY; y++) {
+                this.place(this.centerRingStartX, y, "R");
             }
+        } else {
+            for (let x = 0; x < this.centerRingStartX; x++) {
+                this.place(x, this.centerRingStartY, "R");
+            }
+        }
+
+        if (dirTR === "UP") {
+            for (let y = 0; y < this.centerRingStartY; y++) this.place(this.centerRingEndX, y, "R");
+        } else {
+            for (let x = this.centerRingEndX + 1; x < this.sizeWidth; x++)
+                this.place(x, this.centerRingStartY, "R");
+        }
+
+        if (dirBL === "DOWN") {
+            for (let y = this.centerRingEndY + 1; y < this.sizeHeight; y++)
+                this.place(this.centerRingStartX, y, "R");
+        } else {
+            for (let x = 0; x < this.centerRingStartX; x++) this.place(x, this.centerRingEndY, "R");
+        }
+
+        if (dirBR === "DOWN") {
+            for (let y = this.centerRingEndY + 1; y < this.sizeHeight; y++)
+                this.place(this.centerRingEndX, y, "R");
+        } else {
+            for (let x = this.centerRingEndX + 1; x < this.sizeWidth; x++)
+                this.place(x, this.centerRingEndY, "R");
+        }
+
+        const sides = [0, 1, 2, 3];
+        for (let i = sides.length - 1; i > 0; i--) {
+            const j = this.randomInt(0, i);
+            [sides[i], sides[j]] = [sides[j], sides[i]];
+        }
+        const mainSides = [sides[0], sides[1]];
+
+        for (const side of mainSides) {
+            if (side === 0) {
+                const rx = this.randomInt(this.centerRingStartX + 1, this.centerRingEndX - 1);
+                for (let y = 0; y < this.centerRingStartY; y++) this.place(rx, y, "R");
+            } else if (side === 1) {
+                const ry = this.randomInt(this.centerRingStartY + 1, this.centerRingEndY - 1);
+                for (let x = this.centerRingEndX + 1; x < this.sizeWidth; x++)
+                    this.place(x, ry, "R");
+            } else if (side === 2) {
+                const rx = this.randomInt(this.centerRingStartX + 1, this.centerRingEndX - 1);
+                for (let y = this.centerRingEndY + 1; y < this.sizeHeight; y++)
+                    this.place(rx, y, "R");
+            } else if (side === 3) {
+                const ry = this.randomInt(this.centerRingStartY + 1, this.centerRingEndY - 1);
+                for (let x = 0; x < this.centerRingStartX; x++) this.place(x, ry, "R");
+            }
+        }
+
+        const districts: Array<[number, number, number, number]> = [];
+        const visited = Array.from({ length: this.sizeHeight }, () =>
+            Array(this.sizeWidth).fill(false)
+        );
+
+        for (let y = 0; y < this.sizeHeight; y++) {
+            for (let x = 0; x < this.sizeWidth; x++) {
+                if (this.map[y][x] === "O" && !visited[y][x]) {
+                    let w = 0;
+                    while (
+                        x + w < this.sizeWidth &&
+                        this.map[y][x + w] === "O" &&
+                        !visited[y][x + w]
+                    ) {
+                        w++;
+                    }
+
+                    let h = 0;
+                    let valid = true;
+                    while (y + h < this.sizeHeight && valid) {
+                        for (let i = 0; i < w; i++) {
+                            if (this.map[y + h][x + i] !== "O" || visited[y + h][x + i]) {
+                                valid = false;
+                                break;
+                            }
+                        }
+                        if (valid) h++;
+                    }
+
+                    for (let dy = 0; dy < h; dy++) {
+                        for (let dx = 0; dx < w; dx++) {
+                            visited[y + dy][x + dx] = true;
+                        }
+                    }
+
+                    districts.push([x, y, x + w - 1, y + h - 1]);
+                }
+            }
+        }
+
+        for (const [left, top, right, bottom] of districts) {
+            this.subdivide(left, top, right, bottom);
         }
     }
 
     private subdivide(left: number, top: number, right: number, bottom: number) {
-        const MIN_DISTRICT = 3;
-        const MIN_SIZE = 4;
+        const MIN_SIZE = 3;
 
         const width = right - left + 1;
         const height = bottom - top + 1;
 
         if (width <= 0 || height <= 0) return;
-        if (width <= MIN_DISTRICT || height <= MIN_DISTRICT) return;
 
-        const canSplitVertically = width > 2;
-        const canSplitHorizontally = height > 2;
+        const canSplitVertically = width >= 2 * MIN_SIZE + 1;
+        const canSplitHorizontally = height >= 2 * MIN_SIZE + 1;
+
+        if (!canSplitVertically && !canSplitHorizontally) return;
+        if (this.random() < 0.15) return;
 
         let splitVertically: boolean;
         if (canSplitVertically && canSplitHorizontally) {
@@ -148,6 +232,48 @@ export class CityMap {
             this.subdivide(left, top, right, splitY - 1);
             this.subdivide(left, splitY + 1, right, bottom);
         }
+    }
+
+    private cleanThickRoads() {
+        let found = true;
+
+        while (found) {
+            found = false;
+            for (let y = 0; y < this.sizeHeight - 1; y++) {
+                for (let x = 0; x < this.sizeWidth - 1; x++) {
+                    if (
+                        this.map[y][x] === "R" &&
+                        this.map[y][x + 1] === "R" &&
+                        this.map[y + 1][x] === "R" &&
+                        this.map[y + 1][x + 1] === "R"
+                    ) {
+                        found = true;
+
+                        const tlExtends = this.isRoad(x - 1, y) || this.isRoad(x, y - 1);
+                        const trExtends = this.isRoad(x + 2, y) || this.isRoad(x + 1, y - 1);
+                        const blExtends = this.isRoad(x - 1, y + 1) || this.isRoad(x, y + 2);
+                        const brExtends = this.isRoad(x + 2, y + 1) || this.isRoad(x + 1, y + 2);
+
+                        if (!tlExtends) {
+                            this.map[y][x] = "O";
+                        } else if (!trExtends) {
+                            this.map[y][x + 1] = "O";
+                        } else if (!blExtends) {
+                            this.map[y + 1][x] = "O";
+                        } else if (!brExtends) {
+                            this.map[y + 1][x + 1] = "O";
+                        } else {
+                            this.map[y][x] = "O";
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private isRoad(x: number, y: number): boolean {
+        if (!this.inside(x, y)) return false;
+        return this.map[y][x] === "R";
     }
 
     private randomizeHouses() {
