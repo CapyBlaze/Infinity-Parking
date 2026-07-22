@@ -2,24 +2,17 @@ import { memo, useMemo } from "react";
 import type { ReactElement } from "react";
 
 import { useGLTF } from "@react-three/drei";
-import * as THREE from "three";
 import { Group, type Object3DEventMap } from "three";
 
 import { CityMap } from "../utils/cityMap";
+import Model from "./Model";
 
 const TILE_SIZE = 2;
 
 interface CityProps {
     width?: number;
     height?: number;
-}
-
-interface ModelProps {
-    model: Group<Object3DEventMap>;
-    x: number;
-    z: number;
-    y?: number;
-    rotationY: number;
+    seed?: number;
 }
 
 function isRoad(map: string[][], x: number, z: number): boolean {
@@ -76,31 +69,7 @@ function getBuildingRotation(
     return bestRot;
 }
 
-const Model = memo(function Model({ model, x, z, y = 0, rotationY }: ModelProps) {
-    model.traverse((child) => {
-        if (
-            (child as THREE.Mesh).isMesh &&
-            (child as THREE.Mesh).material !== undefined &&
-            "roughness" in (child as THREE.Mesh).material
-        ) {
-            const mesh = child as THREE.Mesh;
-            const material = mesh.material as THREE.MeshStandardMaterial;
-
-            material.roughness = 1;
-            material.metalness = 0;
-        }
-    });
-
-    return (
-        <primitive
-            object={model.clone()}
-            position={[x * TILE_SIZE, y, z * TILE_SIZE]}
-            rotation={[0, rotationY, 0]}
-        />
-    );
-});
-
-export const City = memo(function City({ width = 3, height = 3 }: CityProps) {
+export const City = memo(function City({ width = 3, height = 3, seed = 0 }: CityProps) {
     const { scene: modelBase } = useGLTF("/models/base.gltf");
     const { scene: modelRoad } = useGLTF("/models/road_straight.gltf");
     const { scene: modelRoadCrossing } = useGLTF("/models/road_straight_crossing.gltf"); // Nouveau
@@ -157,7 +126,7 @@ export const City = memo(function City({ width = 3, height = 3 }: CityProps) {
             H: modelBuildingH,
         };
 
-        const cityMap = new CityMap(4, width, height, 153244);
+        const cityMap = new CityMap(4, width, height, seed);
         const map = cityMap.generateCityMap();
         const list: ReactElement[] = [];
 
@@ -165,6 +134,7 @@ export const City = memo(function City({ width = 3, height = 3 }: CityProps) {
         const offsetZ = -(map[0].length - 1) / 2;
 
         const crossings = new Set<string>();
+        const occupiedCorners = new Set<string>();
 
         for (let x = 0; x < map.length; x++) {
             for (let z = 0; z < map[x].length; z++) {
@@ -203,8 +173,8 @@ export const City = memo(function City({ width = 3, height = 3 }: CityProps) {
                             <Model
                                 key={`map-${x}-${z}`}
                                 model={finalModel}
-                                x={x + offsetX}
-                                z={z + offsetZ}
+                                x={(x + offsetX) * TILE_SIZE}
+                                z={(z + offsetZ) * TILE_SIZE}
                                 rotationY={config.rotation}
                             />
                         );
@@ -226,8 +196,8 @@ export const City = memo(function City({ width = 3, height = 3 }: CityProps) {
                             <Model
                                 key={`map-${x}-${z}`}
                                 model={model.clone()}
-                                x={x + offsetX}
-                                z={z + offsetZ}
+                                x={(x + offsetX) * TILE_SIZE}
+                                z={(z + offsetZ) * TILE_SIZE}
                                 rotationY={buildingRotation}
                             />
                         );
@@ -239,20 +209,21 @@ export const City = memo(function City({ width = 3, height = 3 }: CityProps) {
                             <Model
                                 key={`map-${x}-${z}`}
                                 model={modelBase.clone()}
-                                x={x + offsetX}
-                                z={z + offsetZ}
+                                x={(x + offsetX) * TILE_SIZE}
+                                z={(z + offsetZ) * TILE_SIZE}
                                 rotationY={0}
                             />
                         );
                         break;
                 }
 
-                const occupiedCorners = new Set<string>();
-                const STREETLIGHT_OFFSET = Math.PI / 2;
-
                 for (let x = 0; x < map.length; x++) {
                     for (let z = 0; z < map[x].length; z++) {
                         if (map[x][z] === "R") {
+                            if (occupiedCorners.has(`${x},${z}`) || cornerHasParking(map, x, z)) {
+                                continue;
+                            }
+
                             const N = isRoad(map, x, z - 1) ? 8 : 0;
                             const E = isRoad(map, x + 1, z) ? 4 : 0;
                             const S = isRoad(map, x, z + 1) ? 2 : 0;
@@ -274,8 +245,8 @@ export const City = memo(function City({ width = 3, height = 3 }: CityProps) {
                                         <Model
                                             key={`traffic-3way-${x}-${z}`}
                                             model={trafficModel.clone()}
-                                            x={x + offsetX + 0.5}
-                                            z={z + offsetZ + 0.5}
+                                            x={(x + offsetX + 0.5) * TILE_SIZE}
+                                            z={(z + offsetZ + 0.5) * TILE_SIZE}
                                             y={0.1}
                                             rotationY={ROTATIONS_3WAY[mask]}
                                         />
@@ -290,8 +261,8 @@ export const City = memo(function City({ width = 3, height = 3 }: CityProps) {
                                         <Model
                                             key={`traffic-4way-br-${x}-${z}`}
                                             model={modelTrafficLightC.clone()}
-                                            x={x + offsetX + 0.5}
-                                            z={z + offsetZ + 0.5}
+                                            x={(x + offsetX + 0.5) * TILE_SIZE}
+                                            z={(z + offsetZ + 0.5) * TILE_SIZE}
                                             rotationY={0}
                                         />
                                     );
@@ -303,8 +274,8 @@ export const City = memo(function City({ width = 3, height = 3 }: CityProps) {
                                         <Model
                                             key={`traffic-4way-tl-${x}-${z}`}
                                             model={modelTrafficLightC.clone()}
-                                            x={x + offsetX - 0.5}
-                                            z={z + offsetZ - 0.5}
+                                            x={(x + offsetX - 0.5) * TILE_SIZE}
+                                            z={(z + offsetZ - 0.5) * TILE_SIZE}
                                             y={0.1}
                                             rotationY={Math.PI}
                                         />
@@ -337,18 +308,21 @@ export const City = memo(function City({ width = 3, height = 3 }: CityProps) {
                             const snappedAngle =
                                 Math.round(rawAngle / (Math.PI / 2)) * (Math.PI / 2);
 
+                            const STREETLIGHT_OFFSET = Math.PI / 2;
                             const streetRot = snappedAngle + STREETLIGHT_OFFSET;
 
                             list.push(
                                 <Model
                                     key={`streetlight-${x}-${z}`}
                                     model={modelStreetLight.clone()}
-                                    x={x + offsetX + 0.5}
-                                    z={z + offsetZ + 0.5}
+                                    x={(x + offsetX + 0.5) * TILE_SIZE}
+                                    z={(z + offsetZ + 0.5) * TILE_SIZE}
                                     y={0.1}
                                     rotationY={streetRot}
                                 />
                             );
+
+                            occupiedCorners.add(`${x},${z}`);
                         }
                     }
                 }
@@ -359,6 +333,7 @@ export const City = memo(function City({ width = 3, height = 3 }: CityProps) {
     }, [
         width,
         height,
+        seed,
         modelBase,
         modelRoad,
         modelRoadCrossing,
