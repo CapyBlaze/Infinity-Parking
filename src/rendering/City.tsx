@@ -126,7 +126,7 @@ export const City = memo(function City({ width = 3, height = 3, seed = 0 }: City
             H: modelBuildingH,
         };
 
-        const cityMap = new CityMap(4, width, height, seed);
+        const cityMap = new CityMap(5, width, height, seed);
         const map = cityMap.generateCityMap();
         const list: ReactElement[] = [];
 

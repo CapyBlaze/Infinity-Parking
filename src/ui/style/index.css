@@ -1,6 +1,87 @@
 @import "tailwindcss";
 
+@font-face {
+    font-family: "Quicksand";
+    src: url("/fonts/Quicksand.ttf") format("truetype");
+    font-weight: bold;
+    font-style: normal;
+    font-display: swap;
+}
+
 body {
-  margin: 0;
-  color: #ebebeb
+    margin: 0;
+    color: #ebebeb;
+}
+
+h1 {
+    margin: 0;
+}
+
+.container {
+    background-color: rgb(68, 72, 80);
+    border: 4px solid rgb(203, 204, 206);
+    box-shadow: rgb(129, 129, 129) 0px 3px 0px;
+    border-radius: 6px;
+    font-family: "Quicksand", sans-serif;
+}
+
+.element-not-selectable {
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+.slider-camera {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    background: transparent;
+    cursor: pointer;
+}
+
+.slider-camera:focus {
+    outline: none;
+}
+
+.slider-camera::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 14px;
+    background-color: rgb(68, 72, 80);
+    border: 4px solid rgb(203, 204, 206);
+    border-radius: 6px;
+    box-shadow: rgb(129, 129, 129) 0px 3px 0px;
+}
+
+.slider-camera::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+
+    height: 32px;
+    width: 28px;
+
+    background-color: rgb(68, 72, 80);
+    border: 4px solid rgb(203, 204, 206);
+    border-radius: 6px;
+    box-shadow: rgb(129, 129, 129) 0px 3px 0px;
+
+    margin-top: -13px;
+}
+
+.slider-camera::-moz-range-track {
+    width: 100%;
+    height: 14px;
+    background-color: rgb(68, 72, 80);
+    border: 4px solid rgb(203, 204, 206);
+    border-radius: 6px;
+    box-shadow: rgb(129, 129, 129) 0px 3px 0px;
+}
+
+.slider-camera::-moz-range-thumb {
+    height: 32px;
+    width: 28px;
+    background-color: rgb(68, 72, 80);
+    border: 4px solid rgb(203, 204, 206);
+    border-radius: 6px;
+    box-shadow: rgb(129, 129, 129) 0px 3px 0px;
+    box-sizing: border-box;
 }

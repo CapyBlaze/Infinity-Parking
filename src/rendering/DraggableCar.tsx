@@ -10,10 +10,6 @@ import Model from "./Model";
 
 const TILE_SIZE = 2;
 const CELL_SIZE = TILE_SIZE / 4;
-
-// Marge de sécurité pour éviter une boucle infinie dans getValidRange
-// (au cas où les données seraient corrompues). En pratique la boucle
-// s'arrête d'elle-même dès que la voiture est entièrement hors grille.
 const SAFETY_MARGIN = 64;
 
 function getCarCells(car: { x: number; y: number; dir: Car["dir"] }) {
@@ -29,9 +25,6 @@ function getCarCells(car: { x: number; y: number; dir: Car["dir"] }) {
     ];
 }
 
-// Une case hors de la grille est considérée comme "libre" : c'est ce qui
-// permet à une voiture de sortir du parking en continuant de glisser
-// au-delà du bord, dans son axe de déplacement.
 function isCellFree(
     x: number,
     y: number,
@@ -79,7 +72,7 @@ function getValidRange(
         );
         if (!free) break;
         maxDelta = d;
-        // Une fois complètement sortie de la grille, inutile d'aller plus loin.
+
         if (isFullyOutOfBounds(cells, cols, rows)) break;
         d++;
     }
@@ -115,7 +108,6 @@ interface DraggableCarProps {
     obstacles: Obstacle[];
     allCars: Car[];
     onMove: (carId: string, newX: number, newY: number) => void;
-    /** Appelé quand la voiture a été tirée entièrement hors de la grille. */
     onExit: (carId: string) => void;
 }
 
@@ -141,14 +133,8 @@ export default memo(function DraggableCar({
     const dragOffsetPixels = useRef(0);
     const targetGridDelta = useRef(0);
 
-    // Position "affichée" de la voiture, mise à jour de façon optimiste
-    // (immédiatement au relâchement du drag) plutôt que d'attendre le
-    // aller-retour via les props du parent. C'est ce qui supprime le
-    // petit saut en arrière/avant lors du snapping.
     const [localPos, setLocalPos] = useState({ x: car.x, y: car.y });
 
-    // Si la position vient à changer depuis l'extérieur (reset du niveau,
-    // correction serveur, etc.), on se resynchronise.
     useEffect(() => {
         setLocalPos((prev) =>
             prev.x === car.x && prev.y === car.y ? prev : { x: car.x, y: car.y }
@@ -262,9 +248,6 @@ export default memo(function DraggableCar({
             const cells = getCarCells({ x: newX, y: newY, dir: car.dir });
             const exited = isFullyOutOfBounds(cells, cols, rows);
 
-            // Mise à jour optimiste immédiate : basePos et offset=0 sont
-            // appliqués dans le même rendu, donc pas de saut visuel en
-            // attendant que le parent confirme via la prop `car`.
             setLocalPos({ x: newX, y: newY });
 
             if (exited) {

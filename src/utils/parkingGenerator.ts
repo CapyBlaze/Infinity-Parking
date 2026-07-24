@@ -23,20 +23,25 @@ export class ParkingGenerator {
     private sizeHeight: number;
     private difficulty: number;
     private random: () => number;
+    private levelData: LevelData;
 
     constructor(width: number, height: number, seed: number, difficulty: number) {
         this.sizeWidth = width;
         this.sizeHeight = height;
         this.difficulty = difficulty;
         this.random = this.randomGenerator(seed);
+        this.levelData = { cars: [], obstacles: [] };
     }
 
     public generateParking(): LevelData {
+        if (this.levelData.cars.length > 0 || this.levelData.obstacles.length > 0)
+            return this.levelData;
+
         const cols = this.sizeWidth * 4;
         const rows = this.sizeHeight * 4;
         const totalCells = cols * rows;
 
-        // Facteur de densité selon la difficulté (ex: 1 -> 30%, 2 -> 40%, 3 -> 50% de la surface occupée)
+        // Density factor (Level 1 -> 30%, Level 2 -> 40%, Level 3 -> 50%)
         const densityFactor = 0.25 + this.difficulty * 0.08;
 
         const targetCars = Math.floor((totalCells * densityFactor) / 2);
@@ -108,7 +113,8 @@ export class ParkingGenerator {
             carsPlaced++;
         }
 
-        return { cars, obstacles };
+        this.levelData = { cars, obstacles };
+        return this.levelData;
     }
 
     private randomGenerator(seed: number): () => number {

@@ -1,8 +1,9 @@
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 
 import { useGLTF } from "@react-three/drei";
 import { Group, type Object3DEventMap } from "three";
 
+import { useGameStore } from "../store/useGameStore";
 import { type Car, ParkingGenerator } from "../utils/parkingGenerator";
 import DraggableCar from "./DraggableCar";
 import Model from "./Model";
@@ -15,9 +16,7 @@ interface ParkingProps {
     height?: number;
     seed?: number;
     difficulty?: number;
-    /** Appelé à chaque fois qu'une voiture sort du parking. */
     onCarExit?: (carId: string) => void;
-    /** Appelé quand toutes les voitures sont sorties (niveau terminé). */
     onLevelComplete?: () => void;
 }
 
@@ -42,12 +41,28 @@ export const Parking = memo(function Parking({
     const centerOffsetCols = (cols - 1) / 2;
     const centerOffsetRows = (rows - 1) / 2;
 
+    const resetLevelTrigger = useGameStore((state) => state.resetLevel);
+    const setCarsLeft = useGameStore((state) => state.setCarsLeft);
+
     const [levelData] = useState(() => {
         const parkingGen = new ParkingGenerator(width, height, seed, difficulty);
         return parkingGen.generateParking();
     });
 
     const [cars, setCars] = useState<Car[]>(levelData.cars);
+
+    setCarsLeft(levelData.cars.length);
+
+    useEffect(() => {
+        if (resetLevelTrigger > 0) {
+            setCars([]);
+            setCars(levelData.cars);
+        }
+    }, [resetLevelTrigger, levelData.cars]);
+
+    useEffect(() => {
+        setCarsLeft(cars.length);
+    }, [cars.length, setCarsLeft]);
 
     const handleCarMove = useCallback((carId: string, newX: number, newY: number) => {
         setCars((prevCars) =>
@@ -60,7 +75,6 @@ export const Parking = memo(function Parking({
             setCars((prevCars) => {
                 const remaining = prevCars.filter((c) => c.id !== carId);
                 if (remaining.length === 0) {
-                    // Notifie après le rendu pour éviter un setState pendant un setState.
                     queueMicrotask(() => onLevelComplete?.());
                 }
                 return remaining;
